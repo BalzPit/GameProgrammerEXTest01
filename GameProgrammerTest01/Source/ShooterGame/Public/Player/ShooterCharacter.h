@@ -201,6 +201,9 @@ class AShooterCharacter : public ACharacter
 	/** player released run action */
 	void OnStopRunning();
 
+	/** player pressed teleport action */
+	void OnTeleport();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Reading data
 
@@ -393,6 +396,12 @@ private:
 
 	/** Whether or not the character is moving (based on movement input). */
 	bool IsMoving();
+
+	//ovveride of parent function to allow for double jumping
+	//virtual void CanJump_Implementation() override;
+
+	//flag used to manage double jump activation
+	bool bCanJumpMidAir;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Damage & death

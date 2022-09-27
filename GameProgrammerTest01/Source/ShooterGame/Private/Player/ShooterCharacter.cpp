@@ -67,6 +67,8 @@ AShooterCharacter::AShooterCharacter(const FObjectInitializer& ObjectInitializer
 
 	BaseTurnRate = 45.f;
 	BaseLookUpRate = 45.f;
+
+	bCanJumpMidAir = true;
 }
 
 void AShooterCharacter::PostInitializeComponents()
@@ -884,6 +886,8 @@ void AShooterCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAction("Run", IE_Pressed, this, &AShooterCharacter::OnStartRunning);
 	PlayerInputComponent->BindAction("RunToggle", IE_Pressed, this, &AShooterCharacter::OnStartRunningToggle);
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &AShooterCharacter::OnStopRunning);
+
+	PlayerInputComponent->BindAction("Teleport", IE_Pressed, this, &AShooterCharacter::OnTeleport);
 }
 
 
@@ -1055,6 +1059,12 @@ void AShooterCharacter::OnStartRunningToggle()
 void AShooterCharacter::OnStopRunning()
 {
 	SetRunning(false, false);
+}
+
+void AShooterCharacter::OnTeleport()
+{
+	UShooterCharacterMovement* ShooterMovement = Cast<UShooterCharacterMovement>(GetCharacterMovement());
+	ShooterMovement->TeleportPressed();
 }
 
 bool AShooterCharacter::IsRunning() const
