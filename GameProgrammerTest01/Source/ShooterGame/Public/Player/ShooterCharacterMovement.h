@@ -57,6 +57,8 @@ class UShooterCharacterMovement : public UCharacterMovementComponent
 	UPROPERTY(EditDefaultsOnly)
 	float TeleportDistance;
 
+	float ClipSafetyDistance = 70.0f; //a bit larger than the CapsuleComponent's radius
+
 public:
 
 	//used to indicate that we want to use our NetworkPredictionData_Client_Custom class
@@ -74,6 +76,10 @@ public:
 	//activate the Safe_bWantsToTeleport flag
 	UFUNCTION(BlueprintCallable)
 	void TeleportPressed();
+
+private:
+	//teleport ability implementation
+	void Teleport();
 
 };
 

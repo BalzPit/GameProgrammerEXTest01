@@ -10,6 +10,8 @@
 UShooterCharacterMovement::UShooterCharacterMovement(const FObjectInitializer& ObjectInitializer)
 	: Super(ObjectInitializer)
 {
+	//set variable based on capsule component's radius
+	//ClipSafetyDistance = GetOwner()->FindComponentByClass<UCapsuleComponent>()->GetUnscaledCapsuleRadius(); //CRASH
 }
 
 
@@ -71,21 +73,7 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 	// TELEPORT
 	if (Safe_bWantsToTeleport)
 	{
-		//FCollisionShape Sphere = FCollisionShape::MakeSphere(SweepSphereRadius);
-		//FHitResult HitResult;
-		//sweep to check in front
-		//GetWorld()->SweepSingleByChannel(HitResult, Start, End, FQuat::Identity, /*tracechaannel*/ ,Sphere)
-
-		FVector CharacterLocation = CharacterOwner->GetActorLocation();
-		//FVector CharacterRotation = CharacterOwner->GetActorRotation().Vector();
-
-		//CharacterRotation = VectorPlaneProject(CharacterRotation, new FVector(0,0,1));
-		FVector NewLocation = CharacterLocation + CharacterOwner->GetActorForwardVector() * TeleportDistance;
-		//teleport player
-		CharacterOwner->SetActorLocation(NewLocation, false, 0, ETeleportType::TeleportPhysics);
-
-		//reset flag
-		Safe_bWantsToTeleport = false;
+		Teleport();
 	}
 }
 
@@ -95,6 +83,41 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 void UShooterCharacterMovement::TeleportPressed()
 {
 	Safe_bWantsToTeleport = true;
+}
+
+
+
+//Set new location to teleport character to
+void UShooterCharacterMovement::Teleport()
+{
+	FVector CharacterLocation = CharacterOwner->GetActorLocation();
+	FVector NewLocation = CharacterLocation + CharacterOwner->GetActorForwardVector() * TeleportDistance;
+	FVector LinetraceStop = NewLocation + CharacterOwner->GetActorForwardVector() * ClipSafetyDistance; //trace line a bit further than teleport distance to avoid edge-case clipping
+
+	FHitResult OutHit;
+
+	//check for objects in front of the character (don't want to teleport through or into solid objects)
+	if (GetWorld()->LineTraceSingleByChannel(OutHit, CharacterLocation, LinetraceStop, ECC_Camera))
+	{
+		//if trace hit something, set different teleport Location 
+		if ((CharacterLocation - OutHit.ImpactPoint).Size() > ClipSafetyDistance)
+		{
+			// line trace hit, but not near character -> we don't want to set the new location directly to the impact point otherwise the character may clip into map geometry
+			NewLocation = OutHit.ImpactPoint - CharacterOwner->GetActorForwardVector() * ClipSafetyDistance;
+		}
+		else
+		{
+			// travel distance is too small (e.g: teleporting towards a wall while very close to it), teleport to current location
+			NewLocation = CharacterLocation;
+		}
+	}
+
+	UE_LOG(LogTemp, Display, TEXT("Teleport distance = %f"), (CharacterLocation - OutHit.ImpactPoint).Size());
+
+	//teleport player to new location
+	CharacterOwner->SetActorLocation(NewLocation, false, 0, ETeleportType::TeleportPhysics);
+
+	Safe_bWantsToTeleport = false;
 }
 
 
