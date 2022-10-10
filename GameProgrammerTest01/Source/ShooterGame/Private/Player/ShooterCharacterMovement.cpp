@@ -11,8 +11,11 @@ UShooterCharacterMovement::UShooterCharacterMovement(const FObjectInitializer& O
 	: Super(ObjectInitializer)
 {
 	//set variable based on capsule component's radius
-	//ClipSafetyDistance = GetOwner()->FindComponentByClass<UCapsuleComponent>()->GetUnscaledCapsuleRadius(); //CRASH
+	//TeleportClipSafetyDistance = GetOwner()->FindComponentByClass<UCapsuleComponent>()->GetUnscaledCapsuleRadius(); //CRASH
+
+	JetpackForce = 0;
 }
+
 
 
 float UShooterCharacterMovement::GetMaxSpeed() const
@@ -43,8 +46,6 @@ FNetworkPredictionData_Client* UShooterCharacterMovement::GetPredictionData_Clie
 
 	if (ClientPredictionData == nullptr) //ClientPredictionData is a cached value
 	{
-		// set client prediction data type inside charactermovementcomponent
-
 		UShooterCharacterMovement* MutableThis = const_cast<UShooterCharacterMovement*>(this);
 
 		MutableThis->ClientPredictionData = new FNetworkPredictionData_Client_Custom(*this); //set networkpredictiondata type to our custom type
@@ -61,8 +62,9 @@ void UShooterCharacterMovement::UpdateFromCompressedFlags(uint8 Flags)
 {
 	Super::UpdateFromCompressedFlags(Flags);
 
-	//set variable on server based on custom flag value
+	//set variables on server based on custom flag value
 	Safe_bWantsToTeleport = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
+	Safe_bWantsToJetpack = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
 }
 
 
@@ -75,14 +77,48 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 	{
 		Teleport();
 	}
+
+	//JETPACK
+	if (Safe_bWantsToJetpack)
+	{
+		Jetpack();
+	}
+	else
+	{
+		//reset jetpack force
+		JetpackForce = JetpackInitialForce;
+	}
 }
 
 
 
-//toggle flag on client in response to player input
+void UShooterCharacterMovement::SetDeltaTime(float DeltaSeconds)
+{
+	//set deltatime on client and also send it to server
+	DeltaTime = DeltaSeconds;
+	Server_SetDeltaTime(DeltaSeconds);
+}
+
+
+
+//toggle flags on client
 void UShooterCharacterMovement::TeleportPressed()
 {
 	Safe_bWantsToTeleport = true;
+}
+
+
+
+void UShooterCharacterMovement::JetpackPressed()
+{
+	Safe_bWantsToJetpack = true;
+}
+
+
+
+void UShooterCharacterMovement::JetpackReleased()
+{
+	Safe_bWantsToJetpack = false;
 }
 
 
@@ -92,7 +128,7 @@ void UShooterCharacterMovement::Teleport()
 {
 	FVector CharacterLocation = CharacterOwner->GetActorLocation();
 	FVector NewLocation = CharacterLocation + CharacterOwner->GetActorForwardVector() * TeleportDistance;
-	FVector LinetraceStop = NewLocation + CharacterOwner->GetActorForwardVector() * ClipSafetyDistance; //trace line a bit further than teleport distance to avoid edge-case clipping
+	FVector LinetraceStop = NewLocation + CharacterOwner->GetActorForwardVector() * TeleportClipSafetyDistance; //trace line a bit further than teleport distance to avoid edge-case clipping
 
 	FHitResult OutHit;
 
@@ -100,10 +136,10 @@ void UShooterCharacterMovement::Teleport()
 	if (GetWorld()->LineTraceSingleByChannel(OutHit, CharacterLocation, LinetraceStop, ECC_Camera))
 	{
 		//if trace hit something, set different teleport Location 
-		if ((CharacterLocation - OutHit.ImpactPoint).Size() > ClipSafetyDistance)
+		if ((CharacterLocation - OutHit.ImpactPoint).Size() > TeleportClipSafetyDistance)
 		{
 			// line trace hit, but not near character -> we don't want to set the new location directly to the impact point otherwise the character may clip into map geometry
-			NewLocation = OutHit.ImpactPoint - CharacterOwner->GetActorForwardVector() * ClipSafetyDistance;
+			NewLocation = OutHit.ImpactPoint - CharacterOwner->GetActorForwardVector() * TeleportClipSafetyDistance;
 		}
 		else
 		{
@@ -122,6 +158,35 @@ void UShooterCharacterMovement::Teleport()
 
 
 
+//propel character upwards
+void UShooterCharacterMovement::Jetpack()
+{
+	//increase strength of vertical propulsion over time
+	if (JetpackForce < JetpackMaxForce)
+	{
+		JetpackForce += JetpackForceIncreaseRate * DeltaTime;
+
+		if (JetpackForce > JetpackMaxForce)
+		{
+			//don't exceed max force
+			JetpackForce = JetpackMaxForce;
+		}
+	}
+
+	//set vertical velocity up to a limit
+	Velocity.Z += JetpackForce; 
+
+}
+
+
+
+void UShooterCharacterMovement::Server_SetDeltaTime_Implementation(float DeltaSeconds)
+{
+	// server and client deltatime need to match
+	DeltaTime = DeltaSeconds;
+}
+
+
 //----------------------------------------------------------------------------------------------------- SavedMove_Custom
 
 
@@ -132,8 +197,12 @@ bool UShooterCharacterMovement::FSavedMove_Custom::CanCombineWith(const FSavedMo
 	//cast to custom SavedMove
 	FSavedMove_Custom* NewCustomMove = static_cast<FSavedMove_Custom*>(NewMove.Get());
 
-	//check if variable is different, if so no combination can be done
+	//check if any variable is different, if so no combination can be done
 	if (Saved_bWantsToTeleport != NewCustomMove->Saved_bWantsToTeleport)
+	{
+		return false;
+	}
+	if (Saved_bWantsToJetpack != NewCustomMove->Saved_bWantsToJetpack)
 	{
 		return false;
 	}
@@ -149,6 +218,7 @@ void UShooterCharacterMovement::FSavedMove_Custom::Clear()
 	FSavedMove_Character::Clear();
 
 	Saved_bWantsToTeleport = 0;
+	Saved_bWantsToJetpack = 0;
 }
 
 
@@ -159,6 +229,9 @@ uint8 UShooterCharacterMovement::FSavedMove_Custom::GetCompressedFlags() const
 
 	//if wants to Teleport then activate custom flag 0 -> custom flag 0 is assigned to Teleportation movement functionality
 	if (Saved_bWantsToTeleport) Result |= FLAG_Custom_0;
+
+	//custom flag 1 is assigned to Jetpack functionality
+	if (Saved_bWantsToJetpack) Result |= FLAG_Custom_1;
 
 	return Result;
 }
@@ -173,8 +246,9 @@ void UShooterCharacterMovement::FSavedMove_Custom::SetMoveFor(ACharacter* C, flo
 
 	UShooterCharacterMovement* CharacterMovement = Cast<UShooterCharacterMovement>(C->GetCharacterMovement());
 
-	//save variable state in the SavedMove
+	//save variables state in the SavedMove
 	Saved_bWantsToTeleport = CharacterMovement->Safe_bWantsToTeleport;
+	Saved_bWantsToJetpack = CharacterMovement->Safe_bWantsToJetpack;
 }
 
 
@@ -187,6 +261,7 @@ void UShooterCharacterMovement::FSavedMove_Custom::PrepMoveFor(ACharacter* C)
 	UShooterCharacterMovement* CharacterMovement = Cast<UShooterCharacterMovement>(C->GetCharacterMovement());
 
 	CharacterMovement->Safe_bWantsToTeleport = Saved_bWantsToTeleport;
+	CharacterMovement->Safe_bWantsToJetpack = Saved_bWantsToJetpack;
 }
 
 

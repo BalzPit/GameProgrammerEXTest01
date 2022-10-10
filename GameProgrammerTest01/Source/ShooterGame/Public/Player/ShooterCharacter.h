@@ -2,6 +2,7 @@
 
 #pragma once
 
+#include "ShooterCharacterMovement.h"
 #include "ShooterTypes.h"
 #include "ShooterCharacter.generated.h"
 
@@ -204,6 +205,12 @@ class AShooterCharacter : public ACharacter
 	/** player pressed teleport action */
 	void OnTeleport();
 
+	/** player pressed jetpack action */
+	void OnStartJetpack();
+
+	/** player released jetpack action */
+	void OnStopJetpack();
+
 	//////////////////////////////////////////////////////////////////////////
 	// Reading data
 
@@ -280,6 +287,10 @@ private:
 	/** pawn mesh: 1st person view */
 	UPROPERTY(VisibleDefaultsOnly, Category = Mesh)
 	USkeletalMeshComponent* Mesh1P;
+
+	/** ShooterCharacterMovementComponent reference*/
+	UShooterCharacterMovement* ShooterMovement;
+
 protected:
 
 	/** socket or bone name for attaching weapon mesh */
@@ -397,11 +408,25 @@ private:
 	/** Whether or not the character is moving (based on movement input). */
 	bool IsMoving();
 
-	//ovveride of parent function to allow for double jumping
-	//virtual void CanJump_Implementation() override;
+	/** flag used to indicate whether jetpack ability can be used */
+	bool bCanJetpack;
 
-	//flag used to manage double jump activation
-	bool bCanJumpMidAir;
+	/** flag toggled when jetpack ability is activated */
+	bool bStartJetpack = false;
+
+	/** flag indicating whether or not jetpack energy is recharging */
+	bool bJetpackEnergyRecharging = false;
+
+	/** Fraction of jetpack energy left, 0 <= JetpackEnergyPool <= 1 */
+	float JetpackEnergyPool = 1.f;
+
+	/** Rate of energy pool deppletion */
+	UPROPERTY(EditDefaultsOnly)
+	float JetpackEnergyDepletionRate;
+
+	/** variable regulating the speed of jetpack energy recovery */
+	UPROPERTY(EditDefaultsOnly)
+	float JetpackEnergyRechargeRate;
 
 	//////////////////////////////////////////////////////////////////////////
 	// Damage & death
@@ -443,6 +468,10 @@ public:
 
 	/** Called on the actor right before replication occurs */
 	virtual void PreReplication(IRepChangedPropertyTracker & ChangedPropertyTracker) override;
+
+	/** Called when character lands after falling */
+	virtual void Landed(const FHitResult& Hit) override;
+
 protected:
 	/** notification when killed, for both the server and client. */
 	virtual void OnDeath(float KillingDamage, struct FDamageEvent const& DamageEvent, class APawn* InstigatingPawn, class AActor* DamageCauser);
