@@ -82,11 +82,19 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 	if (Safe_bWantsToJetpack)
 	{
 		Jetpack();
+
+		//set new movement mode to flying (ignore gravity)
+		SetMovementMode(MOVE_Flying);
 	}
 	else
 	{
 		//reset jetpack force
 		JetpackForce = JetpackInitialForce;
+
+		if (!IsMovingOnGround()) {
+			//set new movement mode to falling
+			SetMovementMode(MOVE_Falling);
+		}
 	}
 }
 
@@ -148,8 +156,6 @@ void UShooterCharacterMovement::Teleport()
 		}
 	}
 
-	UE_LOG(LogTemp, Display, TEXT("Teleport distance = %f"), (CharacterLocation - OutHit.ImpactPoint).Size());
-
 	//teleport player to new location
 	CharacterOwner->SetActorLocation(NewLocation, false, 0, ETeleportType::TeleportPhysics);
 
@@ -173,9 +179,8 @@ void UShooterCharacterMovement::Jetpack()
 		}
 	}
 
-	//set vertical velocity up to a limit
-	Velocity.Z += JetpackForce; 
-
+	//set vertical velocity
+	Velocity.Z += JetpackForce;
 }
 
 

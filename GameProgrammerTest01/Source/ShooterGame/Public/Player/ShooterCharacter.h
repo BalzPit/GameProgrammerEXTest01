@@ -472,6 +472,10 @@ public:
 	/** Called when character lands after falling */
 	virtual void Landed(const FHitResult& Hit) override;
 
+	/** Called when retrieving the energy value for UI purposes */
+	UFUNCTION(BlueprintCallable)
+	virtual float GetJetpackEnergy();
+
 protected:
 	/** notification when killed, for both the server and client. */
 	virtual void OnDeath(float KillingDamage, struct FDamageEvent const& DamageEvent, class APawn* InstigatingPawn, class AActor* DamageCauser);
