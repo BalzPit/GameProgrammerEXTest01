@@ -412,7 +412,7 @@ private:
 	bool bCanJetpack;
 
 	/** flag toggled when jetpack ability is activated */
-	bool bStartJetpack = false;
+	bool bWantsToJetpack = false;
 
 	/** flag indicating whether or not jetpack energy is recharging */
 	bool bJetpackEnergyRecharging = false;

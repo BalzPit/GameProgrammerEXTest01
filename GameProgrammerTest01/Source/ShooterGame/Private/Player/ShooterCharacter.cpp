@@ -910,9 +910,6 @@ void AShooterCharacter::SetupPlayerInputComponent(class UInputComponent* PlayerI
 	PlayerInputComponent->BindAction("Run", IE_Released, this, &AShooterCharacter::OnStopRunning);
 
 	PlayerInputComponent->BindAction("Teleport", IE_Pressed, this, &AShooterCharacter::OnTeleport);
-
-	PlayerInputComponent->BindAction("Jump", IE_Pressed , this, &AShooterCharacter::OnStartJetpack);
-	PlayerInputComponent->BindAction("Jump", IE_Released, this, &AShooterCharacter::OnStopJetpack);
 }
 
 
@@ -1095,20 +1092,17 @@ void AShooterCharacter::OnTeleport()
 
 void AShooterCharacter::OnStartJetpack()
 {
-	if (bCanJetpack) //pressed jump button while also being airborne
-	{
-		ShooterMovement->JetpackPressed();
+	ShooterMovement->JetpackPressed();
 
-		bStartJetpack = true;
-		bJetpackEnergyRecharging = false;
-	}
+	bWantsToJetpack = true;
+	bJetpackEnergyRecharging = false;
 }
 
 void AShooterCharacter::OnStopJetpack()
 {
 	ShooterMovement->JetpackReleased();
 
-	bStartJetpack = false;
+	bWantsToJetpack = false;
 	bJetpackEnergyRecharging = true;
 }
 
@@ -1194,20 +1188,19 @@ void AShooterCharacter::Tick(float DeltaSeconds)
 
 	//JETPACK
 
-	if (bCanJetpack) {
-		if (bStartJetpack) {
-			if(JetpackEnergyPool > 0)
-			{
-				JetpackEnergyPool -= JetpackEnergyDepletionRate * DeltaSeconds;
+	if (bWantsToJetpack) 
+	{
+		if(JetpackEnergyPool > 0)
+		{
+			JetpackEnergyPool -= JetpackEnergyDepletionRate * DeltaSeconds;
 
-				//pass deltatime to movement component
-				ShooterMovement->SetDeltaTime(DeltaSeconds);
-			}
-			else
-			{
-				// no more energy, switch jetpack off
-				OnStopJetpack();
-			}
+			//pass deltatime to movement component
+			ShooterMovement->SetDeltaTime(DeltaSeconds);
+		}
+		else
+		{
+			// no more energy, switch jetpack off
+			OnStopJetpack();
 		}
 	}
 	
@@ -1225,11 +1218,6 @@ void AShooterCharacter::Tick(float DeltaSeconds)
 			bJetpackEnergyRecharging = false;
 		}
 	}
-
-	// if player is in the air jetpack should be able to be activated (from next frame) even when not jumping beforehand
-	bCanJetpack = !ShooterMovement->IsMovingOnGround();
-
-	//UE_LOG(LogTemp, Display, TEXT("Jetpack Energy pool: %f"), JetpackEnergyPool);
 }
 
 
@@ -1255,6 +1243,11 @@ void AShooterCharacter::OnStartJump()
 	{
 		bPressedJump = true;
 	}
+
+	if (!ShooterMovement->IsMovingOnGround()) //pressed jump button while also being airborne
+	{
+		OnStartJetpack();
+	}
 }
 
 void AShooterCharacter::OnStopJump()
@@ -1262,9 +1255,8 @@ void AShooterCharacter::OnStopJump()
 	bPressedJump = false;
 	StopJumping();
 
-	// if character is in the air and jump is released, allow jetpack to be activated
-	if (GetCharacterMovement()->IsFalling()) {
-		bCanJetpack = true;
+	if (bWantsToJetpack) {
+		OnStopJetpack();
 	}
 }
 
