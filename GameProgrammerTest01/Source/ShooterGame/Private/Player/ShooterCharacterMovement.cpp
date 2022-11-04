@@ -65,6 +65,7 @@ void UShooterCharacterMovement::UpdateFromCompressedFlags(uint8 Flags)
 	//set variables on server based on custom flag value
 	Safe_bWantsToTeleport = (Flags & FSavedMove_Character::FLAG_Custom_0) != 0;
 	Safe_bWantsToJetpack = (Flags & FSavedMove_Character::FLAG_Custom_1) != 0;
+	Safe_bWantsToWalljump = (Flags & FSavedMove_Character::FLAG_Custom_2) != 0;
 }
 
 
@@ -78,7 +79,7 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 		Teleport();
 	}
 
-	//JETPACK
+	// JETPACK
 	if (Safe_bWantsToJetpack)
 	{
 		Jetpack();
@@ -91,10 +92,17 @@ void UShooterCharacterMovement::OnMovementUpdated(float DeltaSeconds, const FVec
 		//reset jetpack force
 		JetpackForce = JetpackInitialForce;
 
-		if (!IsMovingOnGround()) {
+		if (!IsMovingOnGround()) 
+		{
 			//set new movement mode to falling
 			SetMovementMode(MOVE_Falling);
 		}
+	}
+
+	// WALL JUMP
+	if (Safe_bWantsToWalljump) 
+	{
+		Walljump();
 	}
 }
 
@@ -127,6 +135,17 @@ void UShooterCharacterMovement::JetpackPressed()
 void UShooterCharacterMovement::JetpackReleased()
 {
 	Safe_bWantsToJetpack = false;
+}
+
+
+
+void UShooterCharacterMovement::WalljumpPressed(FVector Normal)
+{
+	Safe_bWantsToWalljump = true;
+
+	//set normal vector on client and server
+	WallNormal = Normal;
+	Server_SetWallNormal(Normal);
 }
 
 
@@ -185,10 +204,36 @@ void UShooterCharacterMovement::Jetpack()
 
 
 
+void UShooterCharacterMovement::Walljump()
+{
+	//apply regular jump vertical velocity
+	Velocity.Z = JumpZVelocity;
+
+	//we are onnly interested in the X,Y values of the normal vector
+	FVector normal = FVector(WallNormal.X, WallNormal.Y, 0);
+	normal.Normalize();
+
+	//add lateral velocity (adding it keeps the previous momentum)
+	Velocity.X += normal.X*WallJumpLateralForce;
+	Velocity.Y += normal.Y*WallJumpLateralForce;
+
+	//reset flag
+	Safe_bWantsToWalljump = false;
+}
+
+
+
 void UShooterCharacterMovement::Server_SetDeltaTime_Implementation(float DeltaSeconds)
 {
 	// server and client deltatime need to match
 	DeltaTime = DeltaSeconds;
+}
+
+
+void UShooterCharacterMovement::Server_SetWallNormal_Implementation(FVector Normal)
+{
+	// equal server and client's normal vector
+	WallNormal = Normal;
 }
 
 
@@ -211,6 +256,10 @@ bool UShooterCharacterMovement::FSavedMove_Custom::CanCombineWith(const FSavedMo
 	{
 		return false;
 	}
+	if (Saved_bWantsToWalljump != NewCustomMove->Saved_bWantsToWalljump)
+	{
+		return false;
+	}
 
 	return FSavedMove_Character::CanCombineWith(NewMove, InCharacter, MaxDelta);
 }
@@ -224,6 +273,7 @@ void UShooterCharacterMovement::FSavedMove_Custom::Clear()
 
 	Saved_bWantsToTeleport = 0;
 	Saved_bWantsToJetpack = 0;
+	Saved_bWantsToWalljump = 0;
 }
 
 
@@ -235,8 +285,11 @@ uint8 UShooterCharacterMovement::FSavedMove_Custom::GetCompressedFlags() const
 	//if wants to Teleport then activate custom flag 0 -> custom flag 0 is assigned to Teleportation movement functionality
 	if (Saved_bWantsToTeleport) Result |= FLAG_Custom_0;
 
-	//custom flag 1 is assigned to Jetpack functionality
+	//custom flag 1 is assigned to Jetpack ability
 	if (Saved_bWantsToJetpack) Result |= FLAG_Custom_1;
+
+	//custom flag 2 is assigned to Walljump ability
+	if (Saved_bWantsToWalljump) Result |= FLAG_Custom_2;
 
 	return Result;
 }
@@ -254,6 +307,7 @@ void UShooterCharacterMovement::FSavedMove_Custom::SetMoveFor(ACharacter* C, flo
 	//save variables state in the SavedMove
 	Saved_bWantsToTeleport = CharacterMovement->Safe_bWantsToTeleport;
 	Saved_bWantsToJetpack = CharacterMovement->Safe_bWantsToJetpack;
+	Saved_bWantsToWalljump = CharacterMovement->Safe_bWantsToWalljump;
 }
 
 
@@ -267,6 +321,7 @@ void UShooterCharacterMovement::FSavedMove_Custom::PrepMoveFor(ACharacter* C)
 
 	CharacterMovement->Safe_bWantsToTeleport = Saved_bWantsToTeleport;
 	CharacterMovement->Safe_bWantsToJetpack = Saved_bWantsToJetpack;
+	CharacterMovement->Safe_bWantsToWalljump = Saved_bWantsToWalljump;
 }
 
 

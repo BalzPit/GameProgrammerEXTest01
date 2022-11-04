@@ -25,6 +25,7 @@ class UShooterCharacterMovement : public UCharacterMovementComponent
 
 		uint8 Saved_bWantsToTeleport : 1; //we need to save a variable telling the server wether or not we want to Teleport
 		uint8 Saved_bWantsToJetpack : 1;
+		uint8 Saved_bWantsToWalljump : 1;
 
 		virtual bool CanCombineWith(const FSavedMovePtr& NewMove, ACharacter* InCharacter, float MaxDelta) const override;
 		virtual void Clear() override;
@@ -57,27 +58,37 @@ class UShooterCharacterMovement : public UCharacterMovementComponent
 	/** flag toggled when performing jetpack ability */
 	bool Safe_bWantsToJetpack;
 
+	/** flag toggled when performing wall jump ability */
+	bool Safe_bWantsToWalljump;
+
 	/** maximum distance from starting position to position after teleport */
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Movement Abilities")
 	float TeleportDistance;
 
 	/** distance to offset teleport to avoid clipping in case of a teleport near map geometry, a bit larger than the CapsuleComponent's radius */
 	float TeleportClipSafetyDistance = 70.0f;
 
 	/** maximum vertical velocity increase value */
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Movement Abilities")
 	float JetpackMaxForce;
 
 	/** rate at which JetpackForce is increased */
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Movement Abilities")
 	float JetpackForceIncreaseRate;
 
 	/** Starting vertical velocity at jetpack activation */
-	UPROPERTY(EditDefaultsOnly)
+	UPROPERTY(EditDefaultsOnly, Category = "Movement Abilities")
 	float JetpackInitialForce;
 
 	/** vertical velocity increase value */
 	float JetpackForce;
+
+	/** WallJump lateral force pushing chatracter away from the wall */
+	UPROPERTY(EditDefaultsOnly, Category = "Movement Abilities")
+	float WallJumpLateralForce;
+
+	/** normal vector to the wall that character is jumping from */
+	FVector WallNormal;
 
 protected:
 
@@ -103,6 +114,9 @@ public:
 	/** toggle Safe_bWantsToJetpack flag to stop jetpack ability */
 	void JetpackReleased();
 
+	/** activate the Safe_bWantsToWalljump flag */
+	void WalljumpPressed(FVector Normal);
+
 private:
 
 	/** Teleport ability implementation */
@@ -111,8 +125,15 @@ private:
 	/** Jetpack ability implementation */
 	void Jetpack();
 
-	/** DeltaTime variable setter to enable correct server replication */
+	/** Wall jump ability implementation */
+	void Walljump();
+
+	/** DeltaTime variable setter via RPC to enable correct client prediction/server replication */
 	UFUNCTION(Server, Reliable)
 	void Server_SetDeltaTime(float DeltaSeconds);
+
+	/** WallNormal variable setter via RPC to enable correct client prediction/server replication */
+	UFUNCTION(Server, Reliable)
+	void Server_SetWallNormal(FVector Normal);
 };
 

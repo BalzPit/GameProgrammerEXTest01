@@ -1090,6 +1090,8 @@ void AShooterCharacter::OnTeleport()
 	Cast<UShooterCharacterMovement>(GetCharacterMovement())->TeleportPressed();
 }
 
+
+
 void AShooterCharacter::OnStartJetpack()
 {
 	ShooterMovement->JetpackPressed();
@@ -1098,12 +1100,21 @@ void AShooterCharacter::OnStartJetpack()
 	bJetpackEnergyRecharging = false;
 }
 
+
+
 void AShooterCharacter::OnStopJetpack()
 {
 	ShooterMovement->JetpackReleased();
 
 	bWantsToJetpack = false;
 	bJetpackEnergyRecharging = true;
+}
+
+
+
+void AShooterCharacter::OnStartWalljump(FVector WallNormal)
+{
+	ShooterMovement->WalljumpPressed(WallNormal);
 }
 
 
@@ -1246,7 +1257,31 @@ void AShooterCharacter::OnStartJump()
 
 	if (!ShooterMovement->IsMovingOnGround()) //pressed jump button while also being airborne
 	{
-		OnStartJetpack();
+		FCollisionShape Sphere = FCollisionShape::MakeSphere(70);
+		FVector Position = GetActorLocation();
+
+		FHitResult HitResult;
+
+		//check for collision with walls around player
+		if(GetWorld()->SweepSingleByChannel(HitResult, Position, Position, FQuat::Identity, ECC_Camera, Sphere))
+		{
+			float WallAngle = FMath::RadiansToDegrees(acosf(FVector::DotProduct(HitResult.ImpactNormal, FVector(0,0,1))));
+
+			if (WallAngle> 60 && WallAngle<100)
+			{
+				OnStartWalljump(HitResult.ImpactNormal);
+			}
+			else
+			{
+				//no suitable wall available, we can jetpack
+				OnStartJetpack();
+			}
+		}
+		else
+		{
+			//no hit, we can jetpack
+			OnStartJetpack();
+		}
 	}
 }
 

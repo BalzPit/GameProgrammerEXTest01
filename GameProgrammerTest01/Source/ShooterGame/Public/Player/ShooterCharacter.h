@@ -211,6 +211,9 @@ class AShooterCharacter : public ACharacter
 	/** player released jetpack action */
 	void OnStopJetpack();
 
+	/** player pressed jump action mid-air, near a wall */
+	void OnStartWalljump(FVector WallNormal);
+
 	//////////////////////////////////////////////////////////////////////////
 	// Reading data
 
