@@ -68,6 +68,15 @@ AShooterCharacter::AShooterCharacter(const FObjectInitializer& ObjectInitializer
 
 	BaseTurnRate = 45.f;
 	BaseLookUpRate = 45.f;
+
+	//initialize audio components
+	AbilityAC = CreateDefaultSubobject<UAudioComponent>(TEXT("AbilityAudioComp"));
+	AbilityAC->bAutoActivate = false;
+	AbilityAC->SetupAttachment(GetRootComponent());
+
+	JetpackAC = CreateDefaultSubobject<UAudioComponent>(TEXT("JetpackAudioComp"));
+	JetpackAC->bAutoActivate = false;
+	JetpackAC->SetupAttachment(GetRootComponent());
 }
 
 void AShooterCharacter::PostInitializeComponents()
@@ -106,6 +115,9 @@ void AShooterCharacter::PostInitializeComponents()
 	}
 
 	ShooterMovement = Cast<UShooterCharacterMovement>(GetCharacterMovement());
+
+	//set up audio components
+	JetpackAC->SetSound(JetpackSound);
 }
 
 void AShooterCharacter::Destroyed()
@@ -397,6 +409,11 @@ void AShooterCharacter::OnDeath(float KillingDamage, struct FDamageEvent const& 
 	if (RunLoopAC)
 	{
 		RunLoopAC->Stop();
+	}
+
+	if (JetpackAC) 
+	{
+		JetpackAC->Stop();
 	}
 
 	if (GetMesh())
@@ -1088,6 +1105,11 @@ void AShooterCharacter::OnStopRunning()
 void AShooterCharacter::OnTeleport()
 {
 	Cast<UShooterCharacterMovement>(GetCharacterMovement())->TeleportPressed();
+
+	//play audio
+	AbilityAC->SetSound(TeleportSound);
+	AbilityAC->SetVolumeMultiplier(1.0f);
+	AbilityAC->Play();
 }
 
 
@@ -1098,6 +1120,8 @@ void AShooterCharacter::OnStartJetpack()
 
 	bWantsToJetpack = true;
 	bJetpackEnergyRecharging = false;
+
+	JetpackAC->Play();
 }
 
 
@@ -1108,6 +1132,10 @@ void AShooterCharacter::OnStopJetpack()
 
 	bWantsToJetpack = false;
 	bJetpackEnergyRecharging = true;
+	
+	//fade out completely and stop playing in 0.2 seconds
+	JetpackAC->FadeOut(0.2f, 0);
+	JetpackAC->StopDelayed(0.2f);
 }
 
 
@@ -1115,6 +1143,11 @@ void AShooterCharacter::OnStopJetpack()
 void AShooterCharacter::OnStartWalljump(FVector WallNormal)
 {
 	ShooterMovement->WalljumpPressed(WallNormal);
+
+	//play audio
+	AbilityAC->SetSound(WallJumpSound);
+	AbilityAC->SetVolumeMultiplier(2.0f);
+	AbilityAC->Play();
 }
 
 
@@ -1257,7 +1290,7 @@ void AShooterCharacter::OnStartJump()
 
 	if (!ShooterMovement->IsMovingOnGround()) //pressed jump button while also being airborne
 	{
-		FCollisionShape Sphere = FCollisionShape::MakeSphere(70);
+		FCollisionShape Sphere = FCollisionShape::MakeSphere(100); //70 is radius of capsule component
 		FVector Position = GetActorLocation();
 
 		FHitResult HitResult;

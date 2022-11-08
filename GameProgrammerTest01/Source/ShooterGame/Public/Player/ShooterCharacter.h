@@ -386,6 +386,18 @@ protected:
 	UPROPERTY(EditDefaultsOnly, Category = Pawn)
 	USoundCue* TargetingSound;
 
+	/** sound played when teleporting */
+	UPROPERTY(EditDefaultsOnly, Category = Pawn)
+	USoundCue* TeleportSound;
+
+	/** sound played when jetpacking */
+	UPROPERTY(EditDefaultsOnly, Category = Pawn)
+	USoundCue* JetpackSound;
+
+	/** sound played when wall jumping */
+	UPROPERTY(EditDefaultsOnly, Category = Pawn)
+	USoundCue* WallJumpSound;
+
 	/** used to manipulate with run loop sound */
 	UPROPERTY()
 	UAudioComponent* RunLoopAC;
@@ -393,6 +405,14 @@ protected:
 	/** hook to looped low health sound used to stop/adjust volume */
 	UPROPERTY()
 	UAudioComponent* LowHealthWarningPlayer;
+
+	/** used to play sounds on ability activation */
+	UPROPERTY()
+	UAudioComponent* AbilityAC;
+
+	/** used to play sounds on jetpack activation */
+	UPROPERTY()
+	UAudioComponent* JetpackAC;
 
 	/** handles sounds for running */
 	void UpdateRunSounds();
